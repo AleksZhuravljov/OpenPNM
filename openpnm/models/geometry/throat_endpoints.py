@@ -1,7 +1,11 @@
 import scipy as _sp
+from openpnm.utils.misc import ignore_warning
 from .throat_length import ctc as _ctc
+from openpnm.utils import logging as _logging
+_logger = _logging.getLogger(__name__)
 
 
+@ignore_warning(RuntimeWarning)
 def cubic_pores(target, pore_diameter='pore.diameter'):
     r"""
     Calculate coordinates of throat endpoints, assuming throats don't overlap
@@ -37,6 +41,12 @@ def cubic_pores(target, pore_diameter='pore.diameter'):
     L = _ctc(target=target, pore_diameter=pore_diameter)
     D1 = network[pore_diameter][cn[:, 0]]
     D2 = network[pore_diameter][cn[:, 1]]
+
+    if _sp.isnan([D1, D2]).any():
+        _logger.warning(f'Some of the calculated entries for {target.name}' +
+                        ' will be undefined since they depend on other geometries.' +
+                        ' Regenerate all of your geometries to solve this issue.')
+
     unit_vec = (xyz[cn[:, 1]] - xyz[cn[:, 0]]) / L[:, None]
     EP1 = xyz[cn[:, 0]] + 0.5 * D1[:, _sp.newaxis] * unit_vec
     EP2 = xyz[cn[:, 1]] - 0.5 * D2[:, _sp.newaxis] * unit_vec
@@ -46,9 +56,11 @@ def cubic_pores(target, pore_diameter='pore.diameter'):
     EP2[mask] = EP1[mask]
     mask = (D1 < D2) & overlap
     EP1[mask] = EP2[mask]
+
     return {'head': EP1, 'tail': EP2}
 
 
+@ignore_warning(RuntimeWarning)
 def spherical_pores(target, pore_diameter='pore.diameter',
                     throat_diameter='throat.diameter',
                     throat_centroid='throat.centroid'):
@@ -99,6 +111,11 @@ def spherical_pores(target, pore_diameter='pore.diameter',
     D2 = network[pore_diameter][cn[:, 1]]
     L1 = _sp.zeros_like(L)
     L2 = _sp.zeros_like(L)
+
+    if _sp.isnan([D1, D2, Dt]).any():
+        _logger.warning(f'Some of the calculated entries for {target.name}' +
+                        ' will be undefined since they depend on other geometries.' +
+                        ' Regenerate all of your geometries to solve this issue.')
     # Handle the case where Dt > Dp
     mask = Dt > D1
     L1[mask] = 0.5 * D1[mask]
@@ -126,6 +143,7 @@ def spherical_pores(target, pore_diameter='pore.diameter',
     overlap = L - 0.5 * (D1+D2) < 0
     mask = overlap & (Dt < h)
     EP1[mask] = EP2[mask] = (xyz[cn[:, 0]] + L1[:, None] * unit_vec_P1T)[mask]
+
     return {'head': EP1, 'tail': EP2}
 
 
@@ -169,7 +187,8 @@ def circular_pores(target, pore_diameter='pore.diameter',
 
     """
     return spherical_pores(target=target, pore_diameter=pore_diameter,
-                           throat_diameter=throat_diameter)
+                           throat_diameter=throat_diameter,
+                           throat_centroid=throat_centroid)
 
 
 def straight_throat(target, throat_centroid='throat.centroid',
@@ -201,6 +220,7 @@ def straight_throat(target, throat_centroid='throat.centroid',
     EP : dictionary
         Coordinates of throat endpoints stored in Dict form. Can be accessed
         via the dict keys 'head' and 'tail'.
+
     """
     network = target.project.network
     throats = network.map_throats(throats=target.Ts, origin=target)
