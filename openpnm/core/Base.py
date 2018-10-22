@@ -1,8 +1,9 @@
 from collections import namedtuple
 import matplotlib.pyplot as plt
-from openpnm.utils import Workspace, logging
+from openpnm.utils import Workspace, logging, Project
 from openpnm.utils.misc import PrintableList, SettingsDict, HealthDict
 import scipy as sp
+
 logger = logging.getLogger(__name__)
 ws = Workspace()
 
@@ -239,7 +240,7 @@ class Base(dict):
 
     name = property(_get_name, _set_name)
 
-    def _get_project(self):
+    def _get_project(self) -> Project:
         for proj in ws.values():
             if self in proj:
                 return proj
