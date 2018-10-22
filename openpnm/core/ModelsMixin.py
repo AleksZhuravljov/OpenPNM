@@ -202,8 +202,9 @@ class ModelsMixin():
             time that ``regenerate_models`` is called.
 
         """
-        if propname in kwargs.values():  # Prevent infinite loops of look-ups
-            raise Exception(propname+' can\'t be both dependency and propname')
+        # We've commented the next two lines for the Multiphase to work
+        # if propname in kwargs.values():  # Prevent infinite loops of look-ups
+        #     raise Exception(propname+' can\'t be both dependency and propname')
         # Add model and regen_mode to kwargs dictionary
         kwargs.update({'model': model, 'regen_mode': regen_mode})
         # Insepct model to extract arguments and default values
