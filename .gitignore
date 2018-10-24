@@ -2,3 +2,4 @@
 .idea/
 .spyproject/
 .pytest_cache/
+.vscode/
