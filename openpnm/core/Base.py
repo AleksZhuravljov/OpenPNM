@@ -1,9 +1,11 @@
+import unyt
+from flatdict import FlatDict
 from collections import namedtuple
 import matplotlib.pyplot as plt
 from openpnm.utils import Workspace, logging, Project
 from openpnm.utils.misc import PrintableList, SettingsDict, HealthDict
 import scipy as sp
-
+import warnings
 logger = logging.getLogger(__name__)
 ws = Workspace()
 
@@ -206,7 +208,9 @@ class Base(dict):
                     raise Exception('Cannot create ' + key + ' when it is' +
                                     ' already defined on a subdomain')
 
-        value = sp.array(value, ndmin=1)  # Convert value to an ndarray
+        # This check allows subclassed numpy arrays through, eg. with units
+        if not isinstance(value, sp.ndarray):
+            value = sp.array(value, ndmin=1)  # Convert value to an ndarray
 
         # Check 3: Enforce correct dict naming
         element = key.split('.')[0]
@@ -224,7 +228,7 @@ class Base(dict):
                 if sp.shape(self[key]) == (0, ):
                     super(Base, self).__setitem__(key, value)
                 else:
-                    logger.warning(key+' is already defined.')
+                    warnings.warn(key+' is already defined.')
             else:
                 super(Base, self).__setitem__(key, value)
             return
@@ -240,6 +244,29 @@ class Base(dict):
                 self.update({key: value})
             else:
                 raise Exception('Cannot write array, wrong length: '+key)
+
+    def __getitem__(self, key):
+        element, prop = key.split('.', 1)
+        if key in self.keys():
+            # Get values if present on self
+            vals = self.get(key)
+        elif key in self.keys(mode='all', deep=True):
+            # Interleave values from geom if found there
+            vals = self.interleave_data(key)
+        elif any([k.startswith(key + '.') for k in self.keys()]):
+            # Create a subdict of values present on self
+            vals = {}
+            keys = self.keys()
+            vals.update({k: self.get(k) for k in keys if k.startswith(key + '.')})
+        elif any([k.startswith(key + '.') for k in self.keys(mode='all', deep=True)]):
+            # Create a subdict of values in subdomains by interleaving
+            vals = {}
+            keys = self.keys(mode='all', deep=True)
+            vals.update({k: self.interleave_data(k) for k in keys
+                         if k.startswith(key + '.')})
+        else:
+            raise KeyError(key)
+        return vals
 
     def _set_name(self, name, validate=True):
         if not hasattr(self, '_name'):
@@ -272,6 +299,14 @@ class Base(dict):
                 return proj
 
     project = property(fget=_get_project)
+
+    @property
+    def network(self):
+        r"""
+        A shortcut to get a handle to the associated network
+        There can only be one so this works
+        """
+        return self.project.network
 
     def clear(self, element=None, mode='all'):
         r"""
@@ -433,62 +468,6 @@ class Base(dict):
                     temp += item.keys(element=element, mode=mode, deep=False)
 
         return temp
-
-    def get(self, keys, default=None):
-        r"""
-        This subclassed method can be used to obtain a dictionary containing
-        subset of data on the object
-
-        Parameters
-        ----------
-        keys : string or list of strings
-            The item or items to retrieve.
-
-        default : any object
-            The value to return in the event that the requested key(s) is not
-            found.  The default is ``None``.
-
-        Returns
-        -------
-        If a single string is given in ``keys``, this method behaves exactly
-        as the ``dict's`` native ``get`` method and returns just the item
-        requested (or the ``default`` if not found).  If, however, a list of
-        strings is received, then a dictionary containing each of the
-        requested items is returned.
-
-        Notes
-        -----
-        This is useful for creating Pandas Dataframes of a specific subset of
-        data.  Note that a Dataframe can be initialized with a ``dict``, but
-        all columns must be the same length.  (e.g. ``df = pd.Dataframe(d)``)
-
-        Examples
-        --------
-        >>> import openpnm as op
-        >>> pn = op.network.Cubic(shape=[5, 5, 5])
-        >>> pore_props = pn.props(element='pore')
-        >>> subset = pn.get(keys=pore_props)
-        >>> print(len(subset))  # Only pore.coords, so gives dict with 1 array
-        1
-        >>> subset = pn.get(['pore.top', 'pore.bottom'])
-        >>> print(len(subset))  # Returns a dict with the 2 requested array
-        2
-
-        It behaves exactly as normal with a dict key string is supplied:
-
-        >>> array = pn.get('pore.coords')
-        >>> print(array.shape)  # Returns requested array
-        (125, 3)
-
-        """
-        # If a list of several keys is passed, then create a subdict
-        if isinstance(keys, list):
-            ret = {}
-            for k in keys:
-                ret[k] = super().get(k, default)
-        else:  # Otherwise return numpy array
-            ret = super().get(keys, default)
-        return ret
 
     # -------------------------------------------------------------------------
     """Data Query Methods"""
@@ -1149,6 +1128,15 @@ class Base(dict):
                 temp_arr[inds] = vals
             else:
                 temp_arr[inds] = dummy_val[atype[0]]
+        # Check if any arrays have units, if so then apply them to result
+        if any([hasattr(a, 'units') for a in arrs]):
+            [a.convert_to_mks() for a in arrs if hasattr(a, 'units')]
+            units = [a.units.__str__() for a in arrs if hasattr(a, 'units')]
+            if len(units) > 0:
+                if len(set(units)) == 1:
+                        temp_arr *= sp.array([1])*getattr(unyt, units[0])
+                else:
+                    raise Exception('Units on the interleaved array are not equal')
         return temp_arr
 
     def interpolate_data(self, propname):
@@ -1213,6 +1201,8 @@ class Base(dict):
             data[Ps] = self[propname]
             Ps12 = net['throat.conns'][Ts]
             values = sp.mean(data[Ps12], axis=1)
+        if hasattr(self[propname], 'units'):
+            values *= self[propname].units
         return values
 
     def filter_by_label(self, pores=[], throats=[], labels=None, mode='or'):

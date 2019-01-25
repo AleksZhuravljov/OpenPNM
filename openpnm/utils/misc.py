@@ -362,7 +362,7 @@ def models_to_table(obj, params=True):
     return '\n'.join(lines)
 
 
-def ignore_warning(warning):
+def ignore_warnings(warning=RuntimeWarning):
     r"""
     Decorator for catching warnings. Useful in pore-scale models where nans
     are inevitable, and numpy gets annoying by throwing lots of RuntimeWarnings.
