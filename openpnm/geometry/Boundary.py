@@ -9,10 +9,10 @@ Boundary -- Subclass of GenericGeometry for Boundary Pores
 from openpnm.models import geometry as gm
 from openpnm.models import misc as mm
 from openpnm.geometry import GenericGeometry
-from openpnm.utils.misc import ignore_warning
+from openpnm.utils.misc import ignore_warnings
 
 
-@ignore_warning(RuntimeWarning)
+@ignore_warnings(RuntimeWarning)
 class Boundary(GenericGeometry):
     r"""
     Boundary subclass of GenericGeometry.

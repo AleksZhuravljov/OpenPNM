@@ -1,11 +1,11 @@
 import scipy as _sp
-from openpnm.utils.misc import ignore_warning
+from openpnm.utils.misc import ignore_warnings
 from .throat_length import ctc as _ctc
 from openpnm.utils import logging as _logging
 _logger = _logging.getLogger(__name__)
 
 
-@ignore_warning(RuntimeWarning)
+@ignore_warnings(RuntimeWarning)
 def cubic_pores(target, pore_diameter='pore.diameter'):
     r"""
     Calculate coordinates of throat endpoints, assuming throats don't overlap
@@ -60,7 +60,7 @@ def cubic_pores(target, pore_diameter='pore.diameter'):
     return {'head': EP1, 'tail': EP2}
 
 
-@ignore_warning(RuntimeWarning)
+@ignore_warnings(RuntimeWarning)
 def spherical_pores(target, pore_diameter='pore.diameter',
                     throat_diameter='throat.diameter',
                     throat_centroid='throat.centroid'):

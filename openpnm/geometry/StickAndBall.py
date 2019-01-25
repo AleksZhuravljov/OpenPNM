@@ -1,9 +1,9 @@
 import openpnm.models as mods
 from openpnm.geometry import GenericGeometry
-from openpnm.utils.misc import ignore_warning
+from openpnm.utils.misc import ignore_warnings
 
 
-@ignore_warning(RuntimeError)
+@ignore_warnings(RuntimeError)
 class StickAndBall(GenericGeometry):
     r"""
     Stick and Ball subclass of GenericGeometry.  This subclass is meant as a
